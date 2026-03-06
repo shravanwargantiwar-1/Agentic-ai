@@ -9,16 +9,13 @@ from pathlib import Path
 import cv2
 import yaml
 
-from agents import (
-    BehaviorAnalysisAgent,
-    DecisionAgent,
-    DemoSurveillanceAgent,
-    DetectionAgent,
-    RiskScoringAgent,
-    RoleClassificationAgent,
-    SurveillanceAgent,
-    TrackingAgent,
-)
+from agents.behavior_analysis_agent import BehaviorAnalysisAgent
+from agents.decision_agent import DecisionAgent
+from agents.detection_agent import DetectionAgent
+from agents.risk_scoring_agent import RiskScoringAgent
+from agents.role_classification_agent import RoleClassificationAgent
+from agents.surveillance_agent import DemoSurveillanceAgent, SurveillanceAgent
+from agents.tracking_agent import TrackingAgent
 from alerts.evidence_capture import EvidenceCapture
 from alerts.hardware_alert import HardwareAlert
 from utils.alert_utils import alert_message
@@ -37,16 +34,17 @@ class ExamSurveillanceSystem:
             self.surveillance_agent = DemoSurveillanceAgent(self.config)
         else:
             self.surveillance_agent = SurveillanceAgent(self.config)
+
         self.detection_agent = DetectionAgent(self.config)
-        self.tracking_agent = TrackingAgent(self.config)
-        self.role_agent = RoleClassificationAgent(self.config)
-        self.behavior_agent = BehaviorAnalysisAgent(self.config)
-        self.risk_agent = RiskScoringAgent(self.config)
-        self.decision_agent = DecisionAgent(self.config)
         self.evidence = EvidenceCapture(self.config.get("alerts", {}).get("evidence_dir", "evidence"))
         self.hardware = HardwareAlert(self.config.get("alerts", {}).get("hardware_enabled", False))
 
-        self.decision_agent.register_callback(self._on_alert)
+        # Per-camera stateful agents to isolate streams.
+        self.tracking_agents: dict[str, TrackingAgent] = {}
+        self.role_agents: dict[str, RoleClassificationAgent] = {}
+        self.behavior_agents: dict[str, BehaviorAnalysisAgent] = {}
+        self.risk_agents: dict[str, RiskScoringAgent] = {}
+        self.decision_agents: dict[str, DecisionAgent] = {}
 
     def _load_config(self, path: str):
         p = Path(path)
@@ -57,6 +55,24 @@ class ExamSurveillanceSystem:
     def _on_alert(self, decision):
         print(alert_message(decision.track_id, decision.risk_score))
         self.hardware.trigger(decision.message)
+
+    def _camera_agents(self, camera_id: str):
+        if camera_id not in self.tracking_agents:
+            self.tracking_agents[camera_id] = TrackingAgent(self.config)
+            self.role_agents[camera_id] = RoleClassificationAgent(self.config)
+            self.behavior_agents[camera_id] = BehaviorAnalysisAgent(self.config)
+            self.risk_agents[camera_id] = RiskScoringAgent(self.config)
+            decision_agent = DecisionAgent(self.config)
+            decision_agent.register_callback(self._on_alert)
+            self.decision_agents[camera_id] = decision_agent
+
+        return (
+            self.tracking_agents[camera_id],
+            self.role_agents[camera_id],
+            self.behavior_agents[camera_id],
+            self.risk_agents[camera_id],
+            self.decision_agents[camera_id],
+        )
 
     def start(self):
         self.running = self.surveillance_agent.start()
@@ -71,22 +87,33 @@ class ExamSurveillanceSystem:
         frames = self.surveillance_agent.get_frames()
         if not frames:
             return {}
+
         out = {}
-        for cam_id, f in frames.items():
-            frame = f.image
+        for cam_id, frame_data in frames.items():
+            frame = frame_data.image
+            tracker, role_agent, behavior_agent, risk_agent, decision_agent = self._camera_agents(cam_id)
+
             detections = self.detection_agent.detect(frame)
-            tracks = self.tracking_agent.update(detections)
-            self.role_agent.classify(tracks)
-            student_tracks = [t for t in tracks if self.role_agent.is_student(t.track_id)]
-            behavior = self.behavior_agent.analyze(frame, student_tracks)
-            assoc = self.risk_agent.associate_detections_to_tracks(detections, student_tracks)
-            scores = self.risk_agent.calculate_scores(detections, behavior, assoc)
-            decisions = self.decision_agent.decide(scores)
+            tracks = tracker.update(detections)
+            role_agent.classify(tracks)
+            student_tracks = [t for t in tracks if role_agent.is_student(t.track_id)]
+            behavior = behavior_agent.analyze(frame, student_tracks)
+            associations = risk_agent.associate_detections_to_tracks(detections, student_tracks)
+            scores = risk_agent.calculate_scores(detections, behavior, associations)
+            decisions = decision_agent.decide(scores)
+
             for tid, dec in decisions.items():
                 if dec.should_alert:
                     events = [e.event_type for e in scores[tid].events]
                     self.evidence.save_screenshot(frame, tid, dec.risk_score, events)
-            out[cam_id] = {"frame": frame, "detections": detections, "tracks": tracks, "decisions": decisions, "risk_scores": scores}
+
+            out[cam_id] = {
+                "frame": frame,
+                "detections": detections,
+                "tracks": tracks,
+                "decisions": decisions,
+                "risk_scores": scores,
+            }
         return out
 
     def run(self, display=True):
@@ -98,9 +125,12 @@ class ExamSurveillanceSystem:
                 results = self.process_frame()
                 if display:
                     for cam_id, data in results.items():
-                        img = self.tracking_agent.draw_tracks(self.detection_agent.draw_detections(data["frame"], data["detections"]), data["tracks"])
+                        tracker = self.tracking_agents.get(cam_id)
+                        img = self.detection_agent.draw_detections(data["frame"], data["detections"])
+                        if tracker is not None:
+                            img = tracker.draw_tracks(img, data["tracks"])
                         cv2.imshow(f"Surveillance - {cam_id}", img)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
                 time.sleep(1 / max(1, self.config.get("performance", {}).get("max_fps", 18)))
         finally:

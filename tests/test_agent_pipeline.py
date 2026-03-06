@@ -44,3 +44,24 @@ def test_risk_scoring_from_behavior_analysis():
     scores = agent.calculate_scores([], analysis, {})
     assert scores[5].total_score >= 10
     assert scores[5].is_alert_triggered is True
+
+
+def test_risk_scores_only_for_current_tracks():
+    cfg = {"risk": {"threshold": 70, "persistence_time": 0, "scores": {"talking_gesture": 15}}}
+    agent = RiskScoringAgent(cfg)
+
+    analysis1 = {
+        1: BehaviorAnalysis(
+            track_id=1,
+            current_behaviors=[BehaviorEvent(behavior_type=BehaviorType.TALKING, confidence=0.95, timestamp=0.0)],
+            suspicion_score=0.8,
+        )
+    }
+    first = agent.calculate_scores([], analysis1, {})
+    assert 1 in first
+
+    # Track 1 disappears; output should not keep stale risk entries.
+    second = agent.calculate_scores([], {}, {})
+    assert 1 not in second
+    assert second == {}
+

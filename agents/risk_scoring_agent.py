@@ -44,6 +44,15 @@ class RiskScoringAgent:
 
     def calculate_scores(self, detections: list, behavior_analyses: Dict[int, BehaviorAnalysis], track_to_detections: dict) -> Dict[int, RiskScore]:
         now = time.time()
+        current_scores: Dict[int, RiskScore] = {}
+        current_track_ids = set(behavior_analyses.keys())
+
+        # Clear stale pending/event history for tracks no longer visible in this frame.
+        stale_tracks = set(self.event_history.keys()) - current_track_ids
+        for track_id in stale_tracks:
+            self.event_history.pop(track_id, None)
+            self.pending_events.pop(track_id, None)
+
         for tid, analysis in behavior_analyses.items():
             self._apply_decay(tid, now)
             for det in track_to_detections.get(tid, []):
@@ -55,8 +64,10 @@ class RiskScoringAgent:
                 et = self._map_behavior(b.behavior_type)
                 if et:
                     self._add_event(tid, et, b.confidence, now)
-            self.scores[tid] = self._build_score(tid)
-        return self.scores
+            current_scores[tid] = self._build_score(tid)
+
+        self.scores = current_scores
+        return current_scores
 
     def _map_behavior(self, behavior: BehaviorType) -> Optional[str]:
         mapping = {BehaviorType.HEAD_TURNING: "head_turning", BehaviorType.TALKING: "talking_gesture", BehaviorType.PHONE_USAGE: "mobile_detected"}
