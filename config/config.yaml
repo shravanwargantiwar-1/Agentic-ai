@@ -1,0 +1,83 @@
+# Camera Settings
+cameras:
+  - id: cam_1
+    rtsp_url: "rtsp://admin:1234@192.168.1.120:554/stream"
+    name: "Main Hall Camera 1"
+    enabled: true
+  - id: cam_2
+    rtsp_url: "rtsp://admin:1234@192.168.1.121:554/stream"
+    name: "Main Hall Camera 2"
+    enabled: false
+
+# Model Settings
+model:
+  yolo_path: "models/yolo11n.pt"
+  openvino_path: "models/yolo11n_openvino"
+  device: "CPU"
+  precision: "FP16"
+
+# Detection Settings
+detection:
+  confidence_threshold: 0.7
+  nms_threshold: 0.45
+  classes: ["person", "cell phone", "calculator"]
+  input_size: [640, 640]
+
+tracking:
+  algorithm: "bytetrack"
+  max_age: 30
+  min_hits: 3
+  iou_threshold: 0.3
+
+pose:
+  model_complexity: 1
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+
+role_classification:
+  mobility_threshold: 50
+  history_frames: 30
+  invigilator_min_mobility: 100
+
+behavior:
+  head_turn_angle_threshold: 30
+  head_turn_duration: 2
+  talking_detection_frames: 15
+  phone_posture_confidence: 0.6
+
+risk:
+  threshold: 70
+  scores:
+    mobile_detected: 60
+    head_turning: 20
+    talking_gesture: 15
+    paper_passing: 40
+    calculator_detected: 30
+  decay_rate: 5
+  persistence_time: 2
+
+alerts:
+  evidence_dir: "evidence/"
+  video_clip_duration: 10
+  screenshot_quality: 95
+  hardware_enabled: false
+  serial_port: "/dev/ttyUSB0"
+  baud_rate: 9600
+
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  secret_key: "change-me"
+
+logging:
+  level: "INFO"
+  file: "logs/surveillance.log"
+  rotation: "10 MB"
+  retention: "7 days"
+
+performance:
+  max_fps: 18
+  frame_skip: 0
+  batch_size: 1
+  num_workers: 4

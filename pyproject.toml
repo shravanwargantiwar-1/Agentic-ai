@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-exam-surveillance"
+version = "0.1.0"
+description = "Agentic AI smart exam surveillance scaffold"
+requires-python = ">=3.10"
+
+dependencies = [
+  "opencv-python>=4.9.0",
+  "numpy>=1.26.0",
+  "pydantic>=2.6.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
