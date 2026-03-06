@@ -10,11 +10,16 @@ requires-python = ">=3.10"
 
 dependencies = [
   "opencv-python>=4.9.0",
-  "numpy>=1.26.0",
+  "numpy>=1.26.0"
+  codex/implement-ai-exam-surveillance-system-y3l8wv
   "PyYAML>=6.0.1",
   "Flask>=3.0.0",
+main
   "pydantic>=2.6.0",
 ]
 
 [tool.pytest.ini_options]
+codex/implement-ai-exam-surveillance-system-y3l8wv
 pythonpath = ["src", "."]
+pythonpath = ["src"]
+main
