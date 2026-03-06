@@ -1,33 +1,36 @@
 # Agentic AI Smart Exam Surveillance & Alert System (OpenVINO-ready)
 
-This project monitors exam halls from CCTV RTSP streams and raises malpractice alerts using a **multi-agent AI pipeline**.
+This project monitors exam halls from CCTV RTSP streams and raises malpractice alerts using a multi-agent AI pipeline.
 
-## Implemented Project Structure
+## Repository Layout
 
 ```text
 .
 ├── README.md
 ├── requirements.txt
+├── pyproject.toml
 ├── config/config.yaml
 ├── main.py
 ├── agents/
-├── utils/
-├── dashboard/
 ├── alerts/
-└── scripts/
+├── dashboard/
+├── scripts/
+├── utils/
+├── src/agentic_exam_surveillance/
+└── tests/
 ```
 
-## Agent Pipeline
+## Runtime Pipeline
 
-1. **SurveillanceAgent**: RTSP frame capture (multi-camera)
-2. **DetectionAgent**: YOLO11/OpenVINO-compatible object detection
-3. **TrackingAgent**: ByteTrack-style person tracking IDs
-4. **RoleClassificationAgent**: Student vs invigilator classification
-5. **BehaviorAnalysisAgent**: suspicious behavior events
-6. **RiskScoringAgent**: confidence + persistence + decay scoring
-7. **DecisionAgent**: alert threshold and escalation
+1. SurveillanceAgent (RTSP / demo capture)
+2. DetectionAgent (YOLO / OpenVINO compatible)
+3. TrackingAgent (camera-isolated tracking state)
+4. RoleClassificationAgent
+5. BehaviorAnalysisAgent
+6. RiskScoringAgent (current-track-only score output)
+7. DecisionAgent + EvidenceCapture + optional HardwareAlert
 
-## Run
+## Quickstart
 
 ```bash
 python -m venv .venv
@@ -36,7 +39,7 @@ pip install -r requirements.txt
 python main.py --config config/config.yaml --demo
 ```
 
-Press `q` to stop display mode.
+Press `q` in display mode to exit.
 
 ## Dashboard
 
@@ -44,10 +47,11 @@ Press `q` to stop display mode.
 python dashboard/app.py
 ```
 
-Open: `http://localhost:5000`
+Open `http://localhost:5000`.
 
-## OpenVINO conversion
+## Model Conversion Notes
 
 ```bash
 python scripts/export_model.py
+python scripts/download_models.py
 ```
